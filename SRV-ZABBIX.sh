@@ -1,95 +1,92 @@
 #!/bin/bash
+# Script d'installation de Zabbix Server pour Debian 12
+# Auteur : Thomas Delzor © 2025 - Tous droits réservés
 
-                # Fonction pour générer un mot de passe sécurisé de 12 caractères
-                generate_password() {
-                    tr -dc A-Za-z0-9 &lt; /dev/urandom | head -c 12
-                }
+# Vérifie que whiptail est présent
+if ! command -v whiptail &> /dev/null; then
+    echo "Installation de whiptail..."
+    apt update && apt install -y whiptail
+fi
 
-                DB_PASSWORD=$(generate_password)
+# Génère un mot de passe sécurisé
+generate_password() {
+    tr -dc A-Za-z0-9 </dev/urandom | head -c 12
+}
 
-                # Affichage du logo
-                clear
-                echo "############################################################"
-                echo "#               ZABBIX INSTALLER                     #"
-                echo "############################################################"
-                echo ""
-                echo "1) Installer Zabbix"
-                echo "2) Quitter"
-                echo ""
-                read -p "Choisissez une option : " choice
+DB_PASSWORD=$(generate_password)
 
-                if [[ "$choice" == "1" ]]; then
-                    # Demande du mot de passe root MySQL
-                    read -s -p "Entrez le mot de passe root MySQL : " MYSQL_ROOT_PASSWORD
-                    echo
+# Message d'intro
+whiptail --title "INFRACT - Installation Zabbix Server" \
+--msgbox "Ce script installe un serveur Zabbix 7.0 complet sur Debian 12 avec Apache, MariaDB et PHP." 12 60
 
-                    # Mise à jour du système
-                    echo "Mise à jour du système..."
-                    apt update && apt upgrade -y
+# Demande confirmation
+if ! whiptail --title "Confirmation" --yesno "Souhaitez-vous procéder à l'installation de Zabbix Server ?" 10 60; then
+    echo "Installation annulée ❌"
+    exit 1
+fi
 
-                    # Changement de la locale
-                    echo "Configuration de la locale en FR..."
-                    dpkg-reconfigure locales
+# Demande mot de passe root MySQL (invisible)
+MYSQL_ROOT_PASSWORD=$(whiptail --passwordbox "Entrez le mot de passe root MySQL (existant) :" 10 60 3>&1 1>&2 2>&3)
 
-                    # Changement du fuseau horaire
-                    echo "Configuration du fuseau horaire..."
-                    dpkg-reconfigure tzdata
+# Mise à jour système
+echo "📦 Mise à jour du système..."
+apt update && apt upgrade -y
 
-                    # Installation du serveur LAMP
-                    echo "Installation du serveur LAMP..."
-                    apt install -y apache2 php php-mysql php-mysqlnd php-ldap php-bcmath php-mbstring php-gd php-pdo php-xml libapache2-mod-php mariadb-server mariadb-client
+# Locales et fuseau horaire
+echo "🌍 Configuration locale et fuseau horaire..."
+dpkg-reconfigure locales
+dpkg-reconfigure tzdata
 
-                    # Installation du dépôt Zabbix
-                    echo "Installation du dépôt Zabbix..."
-                    wget https://repo.zabbix.com/zabbix/7.0/debian/pool/main/z/zabbix-release/zabbix-release_latest_7.0+debian12_all.deb
-                    dpkg -i zabbix-release_latest_7.0+debian12_all.deb
-                    apt update
+# Installation LAMP + PHP modules
+echo "🔧 Installation du serveur LAMP + modules PHP..."
+apt install -y apache2 php php-mysql php-mysqlnd php-ldap php-bcmath php-mbstring php-gd php-pdo php-xml libapache2-mod-php mariadb-server mariadb-client
 
-                    # Installation de Zabbix
-                    echo "Installation de Zabbix..."
-                    apt install -y zabbix-server-mysql zabbix-frontend-php zabbix-apache-conf zabbix-sql-scripts zabbix-agent
+# Installation dépôt Zabbix
+echo "📥 Installation du dépôt Zabbix..."
+wget -q https://repo.zabbix.com/zabbix/7.0/debian/pool/main/z/zabbix-release/zabbix-release_latest_7.0+debian12_all.deb
+dpkg -i zabbix-release_latest_7.0+debian12_all.deb
+apt update
 
-                    # Création de la base de données
-                    echo "Création de la base de données..."
-                    mysql -uroot -p$MYSQL_ROOT_PASSWORD &lt;&lt;EOF
-                CREATE DATABASE zabbix CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
-                CREATE USER 'zabbix'@'localhost' IDENTIFIED BY '$DB_PASSWORD';
-                GRANT ALL PRIVILEGES ON zabbix.* TO 'zabbix'@'localhost';
-                SET GLOBAL log_bin_trust_function_creators = 1;
-                EOF
+# Installation des paquets Zabbix
+echo "📦 Installation des paquets Zabbix..."
+apt install -y zabbix-server-mysql zabbix-frontend-php zabbix-apache-conf zabbix-sql-scripts zabbix-agent
 
-                    # Importation du schéma de la base de données
-                    echo "Importation du schéma de la base de données..."
-                    zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 -uzabbix -p$DB_PASSWORD zabbix
+# Création BDD
+echo "🛢️ Création de la base de données..."
+mysql -uroot -p"$MYSQL_ROOT_PASSWORD" <<EOF
+CREATE DATABASE zabbix CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+CREATE USER 'zabbix'@'localhost' IDENTIFIED BY '$DB_PASSWORD';
+GRANT ALL PRIVILEGES ON zabbix.* TO 'zabbix'@'localhost';
+SET GLOBAL log_bin_trust_function_creators = 1;
+EOF
 
-                    # Désactivation de l'option log_bin_trust_function_creators
-                    mysql -uroot -p$MYSQL_ROOT_PASSWORD &lt;&lt;EOF
-                SET GLOBAL log_bin_trust_function_creators = 0;
-                EOF
+# Import du schéma
+echo "📄 Importation du schéma de la base de données..."
+zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 -uzabbix -p"$DB_PASSWORD" zabbix
 
-                    # Configuration de la base de données pour Zabbix
-                    echo "Configuration de Zabbix..."
-                    sed -i "s/# DBPassword=/DBPassword=$DB_PASSWORD/" /etc/zabbix/zabbix_server.conf
+# Remise à 0 log_bin_trust
+mysql -uroot -p"$MYSQL_ROOT_PASSWORD" <<EOF
+SET GLOBAL log_bin_trust_function_creators = 0;
+EOF
 
-                    # Démarrage et activation des services
-                    echo "Démarrage des services Zabbix..."
-                    systemctl restart zabbix-server zabbix-agent apache2
-                    systemctl enable zabbix-server zabbix-agent apache2
+# Configuration du mot de passe BDD
+echo "🔧 Configuration du mot de passe dans Zabbix Server..."
+sed -i "s/# DBPassword=/DBPassword=$DB_PASSWORD/" /etc/zabbix/zabbix_server.conf
 
-                    # Affichage des informations de connexion
-                    echo "############################################################"
-                    echo "Installation terminée !"
-                    echo "URL d'accès : http://$(hostname -I | awk '{print $1}')/zabbix"
-                    echo "Base de données : zabbix"
-                    echo "Utilisateur : zabbix"
-                    echo "Mot de passe : $DB_PASSWORD"
-                    echo "############################################################"
-                    exit 0
+# Démarrage des services
+echo "🚀 Démarrage des services Zabbix..."
+systemctl restart zabbix-server zabbix-agent apache2
+systemctl enable zabbix-server zabbix-agent apache2
 
-                elif [[ "$choice" == "2" ]]; then
-                    echo "Au revoir !"
-                    exit 0
-                else
-                    echo "Option invalide."
-                    exit 1
-                fi
+# Récupère l'IP locale
+SERVER_IP=$(hostname -I | awk '{print $1}')
+
+# Affichage final avec whiptail
+whiptail --title "✅ Installation terminée !" --msgbox "Zabbix Server est maintenant installé avec succès 🎉
+
+🌐 Interface Web : http://$SERVER_IP/zabbix
+🗄️ Base de données : zabbix
+👤 Utilisateur : zabbix
+🔐 Mot de passe BDD : $DB_PASSWORD
+
+➡️ Identifiants Zabbix Web initiaux : Admin / zabbix" 20 70
