@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Couleurs terminal pour logs
 BLUE='\033[1;34m'
 NC='\033[0m'
 
@@ -10,8 +9,8 @@ if ! command -v whiptail &> /dev/null; then
     apt update && apt install -y whiptail
 fi
 
-CHOICE=$(whiptail --title "Installation Zabbix" \
---menu "Que souhaitez-vous installer ?" 15 60 4 \
+CHOICE=$(whiptail --title "INFRACT - Installation Zabbix" \
+--menu "Que veux-tu installer ?" 15 60 4 \
 "1" "Zabbix Server (Debian 12)" \
 "2" "Zabbix Agent (Debian 12)" \
 3>&1 1>&2 2>&3)
@@ -23,17 +22,17 @@ if [ $exitstatus -ne 0 ]; then
     exit 1
 fi
 
-# Liens vers les scripts
-SCRIPT_SERVER="https://raw.githubusercontent.com/TON_UTILISATEUR_GITHUB/TON_REPO/main/zabbix-server.sh"
-SCRIPT_AGENT="https://raw.githubusercontent.com/TON_UTILISATEUR_GITHUB/TON_REPO/main/zabbix-agent.sh"
+# Liens vers tes scripts GitHub RAW
+SCRIPT_SERVER="https://raw.githubusercontent.com/thomasdlzr/INFRACT-ZABBIX/main/SRV-ZABBIX.sh"
+SCRIPT_AGENT="https://raw.githubusercontent.com/thomasdlzr/INFRACT-ZABBIX/main/AGENT-ZABBIX.sh"
 
 case $CHOICE in
     1)
         echo -e "${BLUE}Installation du serveur Zabbix...${NC}"
-        curl -fsSL "$SCRIPT_SERVER" | bash
+        bash <(curl -fsSL "$SCRIPT_SERVER")
         ;;
     2)
         echo -e "${BLUE}Installation de l'agent Zabbix...${NC}"
-        curl -fsSL "$SCRIPT_AGENT" | bash
+        bash <(curl -fsSL "$SCRIPT_AGENT")
         ;;
 esac
