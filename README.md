@@ -6,7 +6,7 @@ Ce dépôt contient des scripts permettant d’installer rapidement **Zabbix Ser
 
 ## 📦 Installation automatique
 
-### ✅ Pré-requis
+###  Pré-requis
 
 - Système Debian 12
 - Accès `root` ou `sudo`
