@@ -2,8 +2,6 @@
 
 Ce dépôt contient des scripts permettant d’installer rapidement **Zabbix Server** ou **Zabbix Agent** sur **Debian 12**, avec une interface semi-graphique en ligne de commande.
 
-> 🧠 Projet utilisé dans l’infrastructure personnelle **INFRACT** de Thomas Delzor.
-
 ---
 
 ## 📦 Installation automatique
